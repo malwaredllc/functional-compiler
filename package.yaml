@@ -28,7 +28,7 @@ library:
 executables:
   haskell-compiler-exe:
     main:                Main.hs
-    source-dirs:         app
+    source-dirs:         src
     ghc-options:
     - -threaded
     - -rtsopts

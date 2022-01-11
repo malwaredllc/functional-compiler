@@ -25,7 +25,9 @@ source-repository head
 
 library
   exposed-modules:
-      Lib
+      Core.Generator.Nasm
+      Core.Parser
+      Main
   other-modules:
       Paths_haskell_compiler
   hs-source-dirs:
@@ -37,9 +39,11 @@ library
 executable haskell-compiler-exe
   main-is: Main.hs
   other-modules:
+      Core.Generator.Nasm
+      Core.Parser
       Paths_haskell_compiler
   hs-source-dirs:
-      app
+      src
   ghc-options: -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       base >=4.7 && <5

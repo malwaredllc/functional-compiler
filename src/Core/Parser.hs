@@ -1,7 +1,10 @@
+module Core.Parser where
+
 import Data.Char
 
 -- utility function for handling exceptions
 expected x = error $ x ++  " expected"
+
 
 -- Expression type
 data Expression =
@@ -141,12 +144,6 @@ number = literal '-' <-+> digits >>> (\n -> -1 * (read n :: Integer))
 
 data Assign = Assign String Expression
     deriving (Show)
-
-parse :: String -> Assign
-parse s = Assign id expr
-    where (id, expr) = case assign s of
-            Nothing -> error "Invalid assignment"
-            Just ((a,b), _) -> (a, b)
 
 assign :: Parser (String, Expression)
 assign = token(letters) <+-> token(literal '=') <+> expression
