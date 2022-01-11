@@ -5,7 +5,6 @@ import Data.Char
 -- utility function for handling exceptions
 expected x = error $ x ++  " expected"
 
-
 -- Expression type
 data Expression =
     Num Integer
@@ -31,19 +30,19 @@ addOp = literal '+' >>> (\_ -> Add)
 
 -- factor is a single digit
 factor :: Parser Expression
-factor = token(literal '(') <-+> expression <+-> token(literal ')')
+factor = token(literal '(') <-+> token(expression) <+-> token(literal ')')
         <|> number >>> Num
         <|> letters >>> Var
 
 -- term is any result of a multiplication operation involving factors
 -- so basically all multiplication has to happen before we get to addition/subtraction
 term :: Parser Expression
-term = factor +> term'
+term = token(factor) +> term'
 term' e = mulOp <+> term >>> buildOp e +> term'
       <|> result e
 
 token :: Parser a -> Parser a
-token = (<+-> iter space)
+token = (<+-> iterS space)
 
 -- Given a parser and a predicate return the parser only if it satisfies the predicate.
 infix 7 <=>
@@ -57,15 +56,15 @@ infix 7 <=>
 infixl 3 <|>
 (<|>) :: Parser a -> Parser a -> Parser a
 (parserA <|> parserB) input =
-	case parserA input of
-    	Nothing -> parserB input
+    case parserA input of
+        Nothing -> parserB input
     	result -> result
 
 -- Combine two parser together pairing their results up in a tuple
 infixl 6 <+>
 (<+>) :: Parser a -> Parser b -> Parser (a, b)
 (parserA <+> parserB) input =
-	case parserA input of
+    case parserA input of
 	    Nothing -> Nothing
 	    Just (resultA, remainder) -> case parserB remainder of
 	        Nothing -> Nothing
@@ -75,7 +74,7 @@ infixl 6 <+>
 infixl 6 <+->
 (<+-> ) :: Parser a -> Parser b -> Parser a
 (parserA <+->  parserB) input =
-	case parserA input of
+    case parserA input of
 	    Nothing -> Nothing
 	    Just (resultA, remainder) -> case parserB remainder of
 	        Nothing -> Nothing
@@ -85,7 +84,7 @@ infixl 6 <+->
 infixl 6 <-+>
 (<-+> ) :: Parser a -> Parser b -> Parser b
 (parserA <-+>  parserB) input =
-	case parserA input of
+    case parserA input of
 	    Nothing -> Nothing
 	    Just (resultA, remainder) -> case parserB remainder of
 	        Nothing -> Nothing
@@ -108,8 +107,12 @@ infix 4 +>
 		Just (a, cs) -> function a cs
 
 -- iter function to handle more than single letter/digit
-iter :: Parser a -> Parser [a]
-iter m = m <+> iter m >>> (\(x, y) -> x:y)
+iter :: Parser Char -> Parser String
+iter m = (iterS m) <=> (/="")
+
+-- iter function to handle whitespace
+iterS :: Parser a -> Parser [a]
+iterS m = m <+> iterS m >>> (\(x, y) -> x:y)
         <|> result []
 
 -- define some parser primitives
@@ -145,8 +148,11 @@ number = literal '-' <-+> digits >>> (\n -> -1 * (read n :: Integer))
 data Assign = Assign String Expression
     deriving (Show)
 
-assign :: Parser (String, Expression)
-assign = token(letters) <+-> token(literal '=') <+> expression
+accept :: String -> Parser String
+accept w = token (letters <=> (==w))
+
+assign :: Parser Assign
+assign = token(letters) <+-> token(literal '=') <+> expression >>> (\(x, y) -> Assign x y)
 
 result :: a -> Parser a
 result a cs = Just(a, cs)
