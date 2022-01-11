@@ -5,12 +5,16 @@ expected x = error $ x ++  " expected"
 
 -- Expression type
 data Expression =
-    Num Char
+    Num Integer
+    | Var String
     | Add Expression Expression
     | Sub Expression Expression
     | Mul Expression Expression
     | Div Expression Expression
     deriving (Show)
+
+-- Parser type takes a string and returns element of any type it parsed out, and the remaining string
+type Parser a = String -> Maybe (a, String)
 
 mulOp :: Parser (Expression -> Expression -> Expression)
 mulOp = literal '*' >>> (\_ -> Mul)
@@ -21,10 +25,12 @@ addOp :: Parser (Expression -> Expression -> Expression)
 addOp = literal '+' >>> (\_ -> Add)
     <|> literal '-' >>> (\_ -> Sub)
 
+
 -- factor is a single digit
 factor :: Parser Expression
-factor = digit >>> Num
-       <|> literal '(' <-+> expression <+-> literal ')'
+factor = token(literal '(') <-+> expression <+-> token(literal ')')
+        <|> number >>> Num
+        <|> letters >>> Var
 
 -- term is any result of a multiplication operation involving factors
 -- so basically all multiplication has to happen before we get to addition/subtraction
@@ -33,8 +39,8 @@ term = factor +> term'
 term' e = mulOp <+> term >>> buildOp e +> term'
       <|> result e
 
--- Parser type takes a string and returns element of any type it parsed out, and the remaining string
-type Parser a = String -> Maybe (a, String)
+token :: Parser a -> Parser a
+token = (<+-> iter space)
 
 -- Given a parser and a predicate return the parser only if it satisfies the predicate.
 infix 7 <=>
@@ -98,6 +104,12 @@ infix 4 +>
 		Nothing -> Nothing
 		Just (a, cs) -> function a cs
 
+-- iter function to handle more than single letter/digit
+iter :: Parser a -> Parser [a]
+iter m = m <+> iter m >>> (\(x, y) -> x:y)
+        <|> result []
+
+-- define some parser primitives
 char :: Parser Char
 char [] = Nothing
 char (x:xs) = Just(x, xs)
@@ -105,11 +117,17 @@ char (x:xs) = Just(x, xs)
 digit :: Parser Char
 digit = char <=> isDigit
 
+digits :: Parser String
+digits = iter digit
+
 space :: Parser Char
 space = char <=> isSpace
 
 letter :: Parser Char
 letter = char <=> isAlpha
+
+letters :: Parser String
+letters = iter letter
 
 literal :: Char -> Parser Char
 literal c = char <=> (==c)
@@ -117,7 +135,11 @@ literal c = char <=> (==c)
 alphanum :: Parser Char
 alphanum = digit <|> letter
 
-data Assign = Assign Char Expression
+number :: Parser Integer
+number = literal '-' <-+> digits >>> (\n -> -1 * (read n :: Integer))
+        <|> digits >>> (\n -> (read n :: Integer))
+
+data Assign = Assign String Expression
     deriving (Show)
 
 parse :: String -> Assign
@@ -126,8 +148,8 @@ parse s = Assign id expr
             Nothing -> error "Invalid assignment"
             Just ((a,b), _) -> (a, b)
 
-assign :: Parser (Char, Expression)
-assign = letter <+-> literal '=' <+> expression
+assign :: Parser (String, Expression)
+assign = token(letters) <+-> token(literal '=') <+> expression
 
 result :: a -> Parser a
 result a cs = Just(a, cs)
@@ -136,5 +158,5 @@ buildOp :: Expression -> ((Expression -> Expression -> Expression), Expression) 
 buildOp expressionA (op, expressionB) = op expressionA expressionB
 
 expression :: Parser Expression
-expression = factor +> expression'
-expression' e = addOp <+> factor >>> buildOp e +> expression' <|> result e
+expression = token(term) +> expression'
+expression' e = addOp <+> term >>> buildOp e +> expression' <|> result e
